@@ -1,0 +1,64 @@
+sequenceDiagram
+    participant C as Cliente
+    participant R as app.routes
+    participant F as app.factura_electronica
+    participant FE as app.factura_exportacion
+    participant P as pyafipws
+    participant A as AFIP
+
+    C->>R: POST /api/afipws/facturador (con JSON)
+    activate R
+    R->>F: facturar(json_data)
+    activate F
+    F->>P: WSAA.Autenticar()
+    activate P
+    P->>A: Solicitar Token de Acceso
+    A-->>P: Token de Acceso
+    P-->>F: Token de Acceso (TA)
+    deactivate P
+    
+    F->>F: new Comprobante(json_data)
+    F->>F: comprobante.autorizar(wsfev1)
+    activate F
+    
+    F->>P: wsfev1.CrearFactura(...)
+    F->>P: wsfev1.CAESolicitar()
+    activate P
+    P->>A: Solicitar CAE
+    A-->>P: CAE y Datos de Autorización
+    P-->>F: wsfev1.CAE, wsfev1.Vencimiento, etc.
+    deactivate P
+    
+    deactivate F
+    F-->>R: JSON con CAE y nro_comprobante
+    deactivate F
+    R-->>C: JSON Response
+    deactivate R
+
+    Note over C,A: --- Facturación de Exportación ---
+    C->>R: POST /api/afipws/facturador_exportacion (con JSON)
+    activate R
+    R->>FE: facturar_exportacion(json_data)
+    activate FE
+    FE->>P: WSAA.Autenticar()
+    activate P
+    P->>A: Solicitar Token de Acceso
+    A-->>P: Token de Acceso
+    P-->>FE: Token de Acceso (TA)
+    deactivate P
+    
+    FE->>FE: CrearFactura WSFEXv1
+    FE->>P: wsfex.CrearFactura(...)
+    FE->>P: wsfex.AgregarItem(...)
+    FE->>P: wsfex.Authorize()
+    activate P
+    P->>A: Solicitar CAE Exportación
+    A-->>P: CAE y Datos de Autorización
+    P-->>FE: wsfex.CAE, wsfex.FchVencCAE
+    deactivate P
+    
+    deactivate FE
+    FE-->>R: JSON con CAE y datos exportación
+    deactivate FE
+    R-->>C: JSON Response Exportación
+    deactivate R
